@@ -8,25 +8,25 @@ import Mouse
 
 runReactive
   : model -- initial model
-  -> (action -> model -> model) -- update function
-  -> (model -> Reactive action) -- view function
+  -> (message -> model -> model) -- update function
+  -> (model -> Reactive message) -- view function
   -> Signal Element
 runReactive model update view =
   let
-    -- updateState : model -> (model, Reactive action)
+    -- updateState : model -> (model, Reactive message)
     updateState newModel =
       (newModel, view newModel)
 
-    -- updateReactive : Event -> (model, Reactive action) -> (model, Reactive action)
+    -- updateReactive : Event -> (model, Reactive message) -> (model, Reactive message)
     updateReactive event (model, reactive) =
       case reactive.reaction event of
-        Just action ->
-          updateState (update action model)
+        Just message ->
+          updateState (update message model)
 
         Nothing ->
           (model, reactive)
 
-    -- makeElement : (Int, Int) -> (model, Reactive action) -> Element
+    -- makeElement : (Int, Int) -> (model, Reactive message) -> Element
     makeElement size (_, { visual }) =
       Pic.toElement size visual
   in
