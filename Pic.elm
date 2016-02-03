@@ -66,9 +66,9 @@ atop picAtop picBelow =
 atopDims : Dim -> Dim -> Dim
 atopDims atop below =
   { toLeft = min atop.toLeft below.toLeft
-  , toTop = min atop.toTop below.toTop
+  , toTop = max atop.toTop below.toTop
   , toRight = max atop.toRight below.toRight
-  , toBottom = max atop.toBottom below.toBottom
+  , toBottom = min atop.toBottom below.toBottom
   }
 
 liftPic : (C.Form -> C.Form) -> (Dim -> Dim) -> Pic -> Pic
@@ -159,6 +159,10 @@ outlined lineStyle shape =
   { asForm = C.outlined lineStyle shape.elmShape
   , picSize = shape.shapeSize
   }
+
+debugEnvelope : Pic -> Pic
+debugEnvelope picture =
+  (outlined (C.solid Color.red) (rectFromDim picture.picSize)) `atop` picture
 
 toElement : (Int, Int) -> Pic -> E.Element
 toElement (w, h) picture = C.collage w h [ picture.asForm ]

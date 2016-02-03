@@ -2,42 +2,50 @@ module Reactive where
 
 import Pic exposing (Pic, Direction)
 
+type alias Pos = (Float, Float)
+
 type Event
-  = TouchEvent TouchType (Float, Float)
+  = TouchEvent TouchType Pos
 
 type TouchType
   = FingerDown
   | FingerUp
   | FingerMove
 
+-- Shows where to find reactive:
+type Navigation
+  = Here
+  | Nowhere
+  | Above Navigation
+  | Below Navigation
+
 type alias Reactive message =
   { visual : Pic
-  , reaction : Event -> Maybe message
+  , pick : Pos -> Navigation
+  , reaction : Event -> Navigation -> Maybe message
   }
 
 -- almost like liftReactive0
 static : Pic -> Reactive message
 static picture =
   { visual = picture
-  , reaction = \x -> Nothing
+  , pick = \pos -> if isInside pos (picture.picSize) then Here else Nowhere
+  , reaction = \_ _ -> Nothing
   }
 
-liftReactive : (Pic -> Pic) -> (Event -> Event) -> Reactive message -> Reactive message
-liftReactive mapPic mapEvent reactive =
+liftReactive : (Pic -> Pic) -> (Pos -> Pos) -> Reactive message -> Reactive message
+liftReactive mapPic mapPosition reactive =
   { visual = mapPic reactive.visual
-  , reaction = reactive.reaction << mapEvent
+  , pick = reactive.pick << mapPosition
+  , reaction = reactive.reaction
   }
 
 forwardMessage : (messageA -> Maybe messageB) -> Reactive messageA -> Reactive messageB
 forwardMessage mapping reactive =
-  let mappedReaction event =
-        case reactive.reaction event of
-          Just message -> mapping message
-          Nothing -> Nothing
-
-   in { visual = reactive.visual
-      , reaction = mappedReaction
-      }
+  { visual = reactive.visual
+  , pick = reactive.pick
+  , reaction = \ev nav -> reactive.reaction ev nav `Maybe.andThen` mapping
+  }
 
 nextTo
   : Direction
@@ -54,64 +62,75 @@ atop
   -> Reactive message
 atop reactiveAbove reactiveBelow =
   { visual = Pic.atop reactiveAbove.visual reactiveBelow.visual
+  , pick = findOutWhich reactiveAbove reactiveBelow
   , reaction = delegateEvent reactiveAbove reactiveBelow
   }
 
-delegateEvent
-  : Reactive message
-  -> Reactive message
-  -> (Event -> Maybe message)
-delegateEvent reactiveAbove reactiveBelow (TouchEvent evType pos) =
-  let insideAbove = isInside pos (reactiveAbove.visual.picSize)
-      insideBelow = isInside pos (reactiveBelow.visual.picSize)
-      reactionIfInside itsInside reaction = if itsInside then reaction (TouchEvent evType pos) else Nothing
-   in Maybe.oneOf
-        [ reactionIfInside insideAbove reactiveAbove.reaction
-        , reactionIfInside insideBelow reactiveBelow.reaction
-        ]
+findOutWhich : Reactive message -> Reactive message -> Pos -> Navigation
+findOutWhich reactiveAbove reactiveBelow pos =
+  let
+    dimAbove = reactiveAbove.visual.picSize
+    dimBelow = reactiveBelow.visual.picSize
+   in
+      if isInside pos dimAbove then
+        Above (reactiveAbove.pick pos)
+      else if isInside pos dimBelow then
+        Below (reactiveBelow.pick pos)
+      else if isInside pos (Pic.atopDims dimAbove dimBelow) then
+        Here
+      else
+        Nowhere
 
-isInside : (Float, Float) -> Pic.Dim -> Bool
+delegateEvent : Reactive message -> Reactive message -> Event -> Navigation -> Maybe message
+delegateEvent reactiveAbove reactiveBelow event navigation =
+  case navigation of
+    Here -> Nothing
+    Nowhere -> Nothing
+    Above nav -> reactiveAbove.reaction event nav
+    Below nav -> reactiveBelow.reaction event nav
+
+isInside : Pos -> Pic.Dim -> Bool
 isInside (x, y) dims =
   let between lower value upper = lower <= value && value <= upper
    in between dims.toLeft x dims.toRight && between dims.toBottom y dims.toTop
 
-move : (Float, Float) -> Reactive message -> Reactive message
-move offset = liftReactive (Pic.move offset) (moveEvent offset)
+move : Pos -> Reactive message -> Reactive message
+move offset = liftReactive (Pic.move offset) (movePick offset)
 
-moveEvent : (Float, Float) -> Event -> Event
-moveEvent (offx, offy) (TouchEvent evType (x, y)) = TouchEvent evType (x+offx, y+offy)
+movePick : Pos -> Pos -> Pos
+movePick (offx, offy) (x, y) = (x-offx, y-offy)
 
 scale : Float -> Reactive message -> Reactive message
-scale factor = liftReactive (Pic.scale factor) (scaleEvent factor)
+scale factor = liftReactive (Pic.scale factor) (scalePick factor)
 
-scaleEvent : Float -> Event -> Event
-scaleEvent factor (TouchEvent evType (x, y)) = (TouchEvent evType (x / factor, y / factor))
+scalePick : Float -> Pos -> Pos
+scalePick factor (x, y) = (x / factor, y / factor)
 
 padded : Float -> Reactive message -> Reactive message
 padded padding = liftReactive (Pic.padded padding) identity
 
 onEvent : (Event -> Maybe message) -> Reactive message -> Reactive message
 onEvent getMessage reactive =
-  let react (TouchEvent evType pos) =
-        if isInside pos reactive.visual.picSize
-          then Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), getMessage (TouchEvent evType pos) ]
-          else Nothing
+  let
+    react event navigation =
+      case navigation of
+        Here -> Maybe.oneOf [ getMessage event, reactive.reaction event navigation ]
+        otherwise -> reactive.reaction event navigation
    in { visual = reactive.visual
+      , pick = reactive.pick
       , reaction = react
       }
 
-onFingerEvent : TouchType -> ((Float, Float) -> Maybe message) -> Reactive message -> Reactive message
-onFingerEvent filterType message reactive =
+onFingerEvent : TouchType -> (Pos -> Maybe message) -> Reactive message -> Reactive message
+onFingerEvent filterType getMessage reactive =
   let
     react (TouchEvent evType pos) =
-      if evType == filterType && isInside pos reactive.visual.picSize then
-        Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), message pos ]
+      if evType == filterType then
+        getMessage pos
       else
         Nothing
-   in
-    { visual = reactive.visual
-    , reaction = react
-    }
 
-onFingerDown : ((Float, Float) -> Maybe message) -> Reactive message -> Reactive message
+   in onEvent react reactive
+
+onFingerDown : (Pos -> Maybe message) -> Reactive message -> Reactive message
 onFingerDown = onFingerEvent FingerDown
