@@ -1,32 +1,40 @@
 module Main where
 
-import Graphics.Collage exposing (solid)
 import Graphics.Element exposing (Element)
 import Signal exposing (Signal)
 import Text
 import Color
 import Pic exposing (..)
 import Reactive exposing (Reactive, Event(..))
-import RunReactive
+import App exposing (App)
+import Button exposing (..)
 
-type Action = Add
+type Action = NoAction | Add
 
 someCircle : Pic
 someCircle =
   filled Color.red (circle 10)
 
-renderBoundingBox : Pic -> Pic
-renderBoundingBox picture =
-  (outlined (solid Color.red) (rectFromDim picture.picSize)) `atop` picture
-
 main : Signal Element
 main =
   let
-    update Add value = value + 1
+    countButton = textButton "+1"
 
-    view value =
-      Reactive.scale 10 <| Reactive.nextTo Down
-        (Reactive.onClick (always (Just Add)) (Reactive.static someCircle))
-        (Reactive.static <| text <| Text.fromString <| toString value)
+    update (action, buttonAction) (value, buttonState) = (updateValue action value, countButton.update buttonAction buttonState)
 
-  in RunReactive.runReactive 0 update view
+    updateValue action value =
+      case action of
+        NoAction -> value
+        Add -> value + 1
+
+    makeAdd buttonAction =
+      case buttonAction of
+        Press -> Just (NoAction, Press)
+        Release -> Just (Add, Release)
+
+    view (value, buttonState) =
+      Reactive.nextTo Down
+        (Reactive.forwardMessage makeAdd (countButton.view buttonState))
+        (Reactive.scale 10 <| Reactive.static <| text <| Text.fromString <| toString value)
+
+  in App.run { init = (0, countButton.init), update = update, view = view }

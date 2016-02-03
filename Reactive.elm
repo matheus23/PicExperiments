@@ -3,7 +3,12 @@ module Reactive where
 import Pic exposing (Pic, Direction)
 
 type Event
-  = MouseClick (Float, Float)
+  = TouchEvent TouchType (Float, Float)
+
+type TouchType
+  = FingerDown
+  | FingerUp
+  | FingerMove
 
 type alias Reactive message =
   { visual : Pic
@@ -22,6 +27,17 @@ liftReactive mapPic mapEvent reactive =
   { visual = mapPic reactive.visual
   , reaction = reactive.reaction << mapEvent
   }
+
+forwardMessage : (messageA -> Maybe messageB) -> Reactive messageA -> Reactive messageB
+forwardMessage mapping reactive =
+  let mappedReaction event =
+        case reactive.reaction event of
+          Just message -> mapping message
+          Nothing -> Nothing
+
+   in { visual = reactive.visual
+      , reaction = mappedReaction
+      }
 
 nextTo
   : Direction
@@ -45,10 +61,10 @@ delegateEvent
   : Reactive message
   -> Reactive message
   -> (Event -> Maybe message)
-delegateEvent reactiveAbove reactiveBelow (MouseClick pos) =
+delegateEvent reactiveAbove reactiveBelow (TouchEvent evType pos) =
   let insideAbove = isInside pos (reactiveAbove.visual.picSize)
       insideBelow = isInside pos (reactiveBelow.visual.picSize)
-      reactionIfInside itsInside reaction = if itsInside then reaction (MouseClick pos) else Nothing
+      reactionIfInside itsInside reaction = if itsInside then reaction (TouchEvent evType pos) else Nothing
    in Maybe.oneOf
         [ reactionIfInside insideAbove reactiveAbove.reaction
         , reactionIfInside insideBelow reactiveBelow.reaction
@@ -63,23 +79,39 @@ move : (Float, Float) -> Reactive message -> Reactive message
 move offset = liftReactive (Pic.move offset) (moveEvent offset)
 
 moveEvent : (Float, Float) -> Event -> Event
-moveEvent (offx, offy) (MouseClick (x, y)) = MouseClick (x+offx, y+offy)
+moveEvent (offx, offy) (TouchEvent evType (x, y)) = TouchEvent evType (x+offx, y+offy)
 
 scale : Float -> Reactive message -> Reactive message
 scale factor = liftReactive (Pic.scale factor) (scaleEvent factor)
 
 scaleEvent : Float -> Event -> Event
-scaleEvent factor (MouseClick (x, y)) = (MouseClick (x / factor, y / factor))
+scaleEvent factor (TouchEvent evType (x, y)) = (TouchEvent evType (x / factor, y / factor))
 
 padded : Float -> Reactive message -> Reactive message
 padded padding = liftReactive (Pic.padded padding) identity
 
-onClick : ((Float, Float) -> Maybe message) -> Reactive message -> Reactive message
-onClick message reactive =
-  let react (MouseClick pos) =
+onEvent : (Event -> Maybe message) -> Reactive message -> Reactive message
+onEvent getMessage reactive =
+  let react (TouchEvent evType pos) =
         if isInside pos reactive.visual.picSize
-          then Maybe.oneOf [ reactive.reaction (MouseClick pos), message pos ]
+          then Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), getMessage (TouchEvent evType pos) ]
           else Nothing
    in { visual = reactive.visual
       , reaction = react
       }
+
+onFingerEvent : TouchType -> ((Float, Float) -> Maybe message) -> Reactive message -> Reactive message
+onFingerEvent filterType message reactive =
+  let
+    react (TouchEvent evType pos) =
+      if evType == filterType && isInside pos reactive.visual.picSize then
+        Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), message pos ]
+      else
+        Nothing
+   in
+    { visual = reactive.visual
+    , reaction = react
+    }
+
+onFingerDown : ((Float, Float) -> Maybe message) -> Reactive message -> Reactive message
+onFingerDown = onFingerEvent FingerDown
