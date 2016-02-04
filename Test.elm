@@ -7,34 +7,58 @@ import Color
 import Pic exposing (..)
 import Reactive exposing (Reactive, Event(..))
 import App exposing (App)
-import Button exposing (..)
+import Button exposing (Action(..))
 
-type Action = NoAction | Add
+type Action = Add
 
 someCircle : Pic
 someCircle =
   filled Color.red (circle 10)
 
+-- hides the button App
+-- at least... it should do that
+-- but it's actually impossible to implement
+embed
+  : App Button.State Button.Action
+  -> model
+  -> (message -> model -> model)
+  -> (Reactive Button.Action -> model -> Reactive (Button.Action, message))
+  -> App model message
+embed button outerInit outerUpdate strangeView =
+  let
+    update (outerAction, buttonAction) (outerModel, buttonModel) =
+      (button.update buttonAction buttonModel, updateMaybe outerUpdate outerAction outerModel)
+
+    updateMaybe update mayMessage model =
+      Maybe.withDefault model (Maybe.map (\message -> update message model) mayMessage)
+
+    view (buttonModel, outerModel) = strangeView (button.view buttonModel) outerModel
+
+    hideInner appWithEmbedded =
+      { init = snd appWithEmbedded.init
+      , update = } -- what to do now? we can't update the button without knowing it's previous state!
+   in doSth
+    { init = (button.init, outerInit)
+    , update = update
+    , view = view
+    }
+
 main : Signal Element
 main =
   let
-    countButton = textButton "+1"
+    countButton = Button.textButton "+1"
 
-    update (action, buttonAction) (value, buttonState) = (updateValue action value, countButton.update buttonAction buttonState)
+    update (buttonAction, mayAction) (value, buttonState) =
+      (updateMaybe updateValue mayAction value, countButton.update buttonAction buttonState)
 
-    updateValue action value =
-      case action of
-        NoAction -> value
-        Add -> value + 1
+    updateMaybe update mayAction value =
+      Maybe.withDefault value (Maybe.map (\action -> update action value) mayAction)
 
-    makeAdd buttonAction =
-      case buttonAction of
-        Press -> Just (NoAction, Press)
-        Release -> Just (Add, Release)
+    updateValue Add value = value + 1
 
     view (value, buttonState) =
       Reactive.nextTo Down
-        (Reactive.forwardMessage makeAdd (countButton.view buttonState))
+        (Button.onPress Add (countButton.view buttonState))
         (Reactive.scale 10 <| Reactive.static <| text <| Text.fromString <| toString value)
 
   in App.run { init = (0, countButton.init), update = update, view = view }

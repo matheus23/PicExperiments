@@ -47,6 +47,9 @@ forwardMessage mapping reactive =
   , reaction = \ev nav -> reactive.reaction ev nav `Maybe.andThen` mapping
   }
 
+alwaysForwardMessage : (messageA -> messageB) -> Reactive messageA -> Reactive messageB
+alwaysForwardMessage mapping reactive = forwardMessage (\msg -> Just (mapping msg)) reactive
+
 nextTo
   : Direction
   -> Reactive message

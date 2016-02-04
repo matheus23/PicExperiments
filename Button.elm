@@ -8,23 +8,25 @@ import Text exposing (Text)
 
 type State = Pressed | Normal
 
-type Action = Press | Release
+type Action = Press | Release Bool
 
 anyButton : Pic -> App State Action
 anyButton content =
   let updateButton action state =
         case action of
           Press -> Pressed
-          Release -> Normal
+          Release releasedInside -> Normal
+
+      viewPic state = Pic.atop content (background state content)
 
       viewButton state =
-        Reactive.onEvent createAction
-          (Reactive.static (Pic.atop content (background state content)))
+        Reactive.onEvent (createAction (viewPic state))
+          (Reactive.static (viewPic state))
 
-      createAction event =
+      createAction pic event =
         case event of
-          (TouchEvent FingerDown _) -> Just Press
-          (TouchEvent FingerUp _) -> Just Release
+          (TouchEvent FingerDown pos) -> Just Press
+          (TouchEvent FingerUp pos) -> Just (Release (Reactive.isInside pos pic.picSize))
           otherwise -> Nothing
 
       background state inner =
@@ -43,3 +45,13 @@ anyButton content =
 textButton : String -> App State Action
 textButton label =
   anyButton (Pic.scale 2 <| Pic.text <| Text.color Color.white <| Text.bold <| Text.fromString label)
+
+onPress : message -> Reactive Action -> Reactive (Action, Maybe message)
+onPress message buttonReactive =
+  let
+    makeReaction action =
+      case action of
+        Release True -> (Release True, Just message)
+        other -> (other, Nothing)
+   in
+    Reactive.alwaysForwardMessage makeReaction buttonReactive
