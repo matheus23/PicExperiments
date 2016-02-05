@@ -15,34 +15,6 @@ someCircle : Pic
 someCircle =
   filled Color.red (circle 10)
 
--- hides the button App
--- at least... it should do that
--- but it's actually impossible to implement
-embed
-  : App Button.State Button.Action
-  -> model
-  -> (message -> model -> model)
-  -> (Reactive Button.Action -> model -> Reactive (Button.Action, message))
-  -> App model message
-embed button outerInit outerUpdate strangeView =
-  let
-    update (outerAction, buttonAction) (outerModel, buttonModel) =
-      (button.update buttonAction buttonModel, updateMaybe outerUpdate outerAction outerModel)
-
-    updateMaybe update mayMessage model =
-      Maybe.withDefault model (Maybe.map (\message -> update message model) mayMessage)
-
-    view (buttonModel, outerModel) = strangeView (button.view buttonModel) outerModel
-
-    hideInner appWithEmbedded =
-      { init = snd appWithEmbedded.init
-      , update = } -- what to do now? we can't update the button without knowing it's previous state!
-   in doSth
-    { init = (button.init, outerInit)
-    , update = update
-    , view = view
-    }
-
 main : Signal Element
 main =
   let

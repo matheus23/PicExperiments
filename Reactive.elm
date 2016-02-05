@@ -50,19 +50,18 @@ forwardMessage mapping reactive =
 alwaysForwardMessage : (messageA -> messageB) -> Reactive messageA -> Reactive messageB
 alwaysForwardMessage mapping reactive = forwardMessage (\msg -> Just (mapping msg)) reactive
 
-nextTo
-  : Direction
-  -> Reactive message
-  -> Reactive message
-  -> Reactive message
+appendTo : Direction -> Reactive message -> List (Reactive message) -> Reactive message
+appendTo inDirection reference pics =
+  case pics of
+    [] -> reference
+    (pic :: picsRest) -> nextTo inDirection reference (appendTo inDirection pic picsRest)
+
+nextTo : Direction -> Reactive message -> Reactive message -> Reactive message
 nextTo inDirection reference reactive =
   let offset = Pic.offsetNextTo inDirection reference.visual reactive.visual
    in atop (move offset reactive) reference
 
-atop
-  : Reactive message
-  -> Reactive message
-  -> Reactive message
+atop : Reactive message -> Reactive message -> Reactive message
 atop reactiveAbove reactiveBelow =
   { visual = Pic.atop reactiveAbove.visual reactiveBelow.visual
   , pick = findOutWhich reactiveAbove reactiveBelow
@@ -137,3 +136,9 @@ onFingerEvent filterType getMessage reactive =
 
 onFingerDown : (Pos -> Maybe message) -> Reactive message -> Reactive message
 onFingerDown = onFingerEvent FingerDown
+
+onFingerUp : (Pos -> Maybe message) -> Reactive message -> Reactive message
+onFingerUp = onFingerEvent FingerUp
+
+onFingerMove : (Pos -> Maybe message) -> Reactive message -> Reactive message
+onFingerMove = onFingerEvent FingerMove

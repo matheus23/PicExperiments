@@ -43,6 +43,12 @@ toBorderInDir direction box =
     Down -> (0, box.toBottom)
 
 
+appendTo : Direction -> Pic -> List Pic -> Pic
+appendTo inDirection reference pics =
+  case pics of
+    [] -> reference
+    (pic :: picsRest) -> nextTo inDirection reference (appendTo inDirection pic picsRest)
+
 nextTo : Direction -> Pic -> Pic -> Pic
 nextTo inDirection reference picture = atop (moveNextTo inDirection reference picture) reference
 
@@ -110,6 +116,19 @@ scaleDim factor dim =
   , toBottom = factor * dim.toBottom
   }
 
+alpha : Float -> Pic -> Pic
+alpha a = liftPic (C.alpha a) identity
+
+withDim : Dim -> Pic -> Pic
+withDim dim { asForm } = { asForm = asForm, picSize = dim }
+
+-- "1D Vector from left side to right side"
+width : Pic -> Float
+width pic = pic.picSize.toRight - pic.picSize.toLeft
+
+-- "1D Vector from bottom to top"
+height : Pic -> Float
+height pic = pic.picSize.toTop - pic.picSize.toBottom
 
 -- CONCRETE
 
@@ -121,19 +140,28 @@ text content =
       h = toFloat (E.heightOf asElement)
       textSize =
         { toLeft = -w / 2
-        , toTop = h / 2
+        , toTop = h * (1/3)
         , toRight = w / 2
-        , toBottom = -h / 2
+        , toBottom = -h * (2/3)
         }
    in { asForm = C.text content
       , picSize = textSize
       }
 
 -- origin at center
+squareDim : Float -> Dim
+squareDim radius =
+  { toLeft = -radius
+  , toTop = radius
+  , toRight = radius
+  , toBottom = -radius
+  }
+
+-- origin at center
 circle : Float -> Shape
 circle r =
   { elmShape = C.circle r
-  , shapeSize = Dim -r r r -r
+  , shapeSize = squareDim r
   }
 
 rectFromDim : Dim -> Shape
@@ -159,6 +187,9 @@ outlined lineStyle shape =
   { asForm = C.outlined lineStyle shape.elmShape
   , picSize = shape.shapeSize
   }
+
+solid : Color -> C.LineStyle
+solid = C.solid
 
 debugEnvelope : Pic -> Pic
 debugEnvelope picture =

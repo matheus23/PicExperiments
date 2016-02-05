@@ -5,7 +5,7 @@ import Reactive exposing (Reactive, Event(..), TouchType(..), Navigation(..))
 import Pic exposing (Pic)
 import ExtraSignals
 import Window
-import Text
+import Mouse
 
 type alias App model message =
   { init : model
@@ -14,7 +14,6 @@ type alias App model message =
   }
 
 -- Running Apps
-
 run : App model message -> Signal Element
 run { init, update, view } =
   let
@@ -36,19 +35,23 @@ run { init, update, view } =
         (TouchEvent FingerDown pos) -> reactive.pick pos
         otherwise -> navigation
 
-    makeElement size (_, { visual }, nav) =
-      Pic.toElement size (Pic.nextTo Pic.Up (Pic.debugEnvelope visual) (Pic.debugEnvelope <| Pic.text <| Text.fromString <| toString nav))
+    makeElement size (_, { visual }, _) =
+      Pic.toElement size visual
   in
     Signal.map2 makeElement Window.dimensions
     <| Signal.foldp updateReactive (init, view init, Nowhere) (eventsSignal Window.dimensions)
 
 eventsSignal : Signal (Int, Int) -> Signal Event
 eventsSignal collageSize =
-  let fixedPosition = Signal.map2 fixPosition collageSize ExtraSignals.fingerPosition
+  let
+    makeFloatVec (intX, intY) = (toFloat intX, toFloat intY)
+    fixedTouchPos = Signal.map2 fixPosition collageSize ExtraSignals.fingerPosition
+    fixedMousePos = Signal.map2 fixPosition collageSize (Signal.map makeFloatVec Mouse.position)
    in Signal.mergeMany
-        [ Signal.map (TouchEvent FingerDown) (Signal.sampleOn ExtraSignals.fingerPressed fixedPosition)
-        , Signal.map (TouchEvent FingerUp) (Signal.sampleOn ExtraSignals.fingerReleased fixedPosition)
-        , Signal.map (TouchEvent FingerMove) fixedPosition
+        [ Signal.map (TouchEvent FingerDown) (Signal.sampleOn ExtraSignals.fingerPressed fixedTouchPos)
+        , Signal.map (TouchEvent FingerUp) (Signal.sampleOn ExtraSignals.fingerReleased fixedTouchPos)
+        , Signal.map (TouchEvent FingerMove) fixedTouchPos
+        , Signal.map (TouchEvent FingerMove) fixedMousePos
         ]
 
 -- turns event-space coordinates to collage-space coordinates
