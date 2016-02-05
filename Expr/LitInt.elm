@@ -9,62 +9,68 @@ import Color
 
 type alias Model =
   { intValue : Int
-  , state : ScrubbingState
+  , state : DragginState
   }
 
-type ScrubbingState
-  = NotScrubbing
-  | Scrubbing Int
+type DragginState
+  = NotDraggin
+  | Draggin Float
 
 type Action
-  = StartScrubbing
-  | ChangeScrubbing Int
-  | StopScrubbing
+  = StartDraggin
+  | ChangeDraggin Float
+  | StopDraggin
 
 fromInt : Int -> Model
 fromInt int =
   { intValue = int
-  , state = NotScrubbing
+  , state = NotDraggin
   }
 
 view : Model -> Reactive Action
 view { intValue, state } =
   case state of
-    NotScrubbing ->
-      Reactive.onFingerDown (always <| Just StartScrubbing) <| Reactive.static <| defaultText (toString intValue)
-    Scrubbing delta ->
-      scrubbingView intValue delta
+    NotDraggin ->
+      Reactive.onFingerDown (always <| Just StartDraggin) <| Reactive.static <| defaultText (toString intValue)
+    Draggin delta ->
+      draggingView intValue delta
 
-scrubbingView : Int -> Int -> Reactive Action
-scrubbingView intValue delta =
-  let
-    value = intValue + delta
-    textPic = defaultTextGreen (toString value)
-    changeValue (_, y) = ChangeScrubbing (round (y / Pic.height textPic))
+draggingView : Int -> Float -> Reactive Action
+draggingView intValue delta =
+  let changeValue (_, y) = ChangeDraggin -y
    in
-    Reactive.static textPic
-    |> Reactive.onFingerUp (always <| Just StopScrubbing)
+    Reactive.static (showWheel intValue delta)
+    |> Reactive.onFingerUp (always <| Just StopDraggin)
     |> Reactive.onFingerMove (Just << changeValue)
 
 update : Action -> Model -> Model
 update action { intValue, state } =
   case state of
-    NotScrubbing ->
+    NotDraggin ->
       case action of
-        StartScrubbing ->
-          { intValue = intValue, state = Scrubbing 0 }
-        StopScrubbing ->
-          { intValue = intValue, state = NotScrubbing }
-        ChangeScrubbing delta ->
-          { intValue = intValue, state = NotScrubbing }
-    Scrubbing delta ->
+        StartDraggin ->
+          { intValue = intValue, state = Draggin 0 }
+        StopDraggin ->
+          { intValue = intValue, state = NotDraggin }
+        ChangeDraggin delta ->
+          { intValue = intValue, state = NotDraggin }
+    Draggin delta ->
       case action of
-        StartScrubbing ->
-          { intValue = intValue, state = Scrubbing delta }
-        StopScrubbing ->
-          { intValue = intValue + delta, state = NotScrubbing }
-        ChangeScrubbing newDelta ->
-          { intValue = intValue, state = Scrubbing newDelta }
+        StartDraggin ->
+          { intValue = intValue, state = Draggin delta }
+        StopDraggin ->
+          { intValue = intValue + valueChange delta, state = NotDraggin }
+        ChangeDraggin newDelta ->
+          { intValue = intValue, state = Draggin newDelta }
+
+wheelElemHeight : Float
+wheelElemHeight = 40
+
+wheelSize : Int
+wheelSize = 5
+
+valueChange : Float -> Int
+valueChange delta = round (delta / wheelElemHeight)
 
 defaultText : String -> Pic
 defaultText = Pic.scale 3 << Pic.text << Text.fromString
@@ -75,3 +81,21 @@ defaultTextGreen = Pic.scale 3 << Pic.text << Text.color Color.green << Text.fro
 appendWithRefDim : Direction -> Pic -> List Pic -> Pic
 appendWithRefDim inDirection reference pics =
   Pic.withDim reference.picSize (Pic.appendTo inDirection reference pics)
+
+showWheel : Int -> Float -> Pic
+showWheel intValue dragDistance =
+  let
+    actualValue = intValue + valueChange dragDistance
+    offset = toFloat (valueChange dragDistance) * wheelElemHeight - dragDistance
+    offsetFromDiff diff = (toFloat diff) * wheelElemHeight + offset
+    alphaFromDiff diff = Pic.alpha (1 - (abs <| offsetFromDiff diff) / (toFloat wheelSize * wheelElemHeight))
+
+    valueText = defaultTextGreen (toString actualValue)
+    valuesDiffBefore = List.map negate [1 .. wheelSize]
+    valuesDiffAfter = [1 .. wheelSize]
+    createValue diff = Pic.move (0, offsetFromDiff diff) (alphaFromDiff diff (defaultText (toString (actualValue + diff))))
+    valuesBefore = List.map createValue valuesDiffBefore
+    valuesAfter = List.map createValue valuesDiffAfter
+    wheel = Pic.atopAll (valuesBefore ++ [Pic.move (0, offset) valueText] ++ valuesAfter)
+   in
+    Pic.withDim valueText.picSize wheel

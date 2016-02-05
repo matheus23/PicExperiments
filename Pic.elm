@@ -63,6 +63,14 @@ offsetNextTo inDirection reference picture =
       touchingPointPic = toBorderInDir (opposite inDirection) picture.picSize
    in touchingPointPic `to` touchingPointRef
 
+atopAll : List Pic -> Pic
+atopAll pics =
+  case pics of
+    [] ->
+      { asForm = C.group [], picSize = Dim 0 0 0 0 }
+    (elem :: rest) ->
+      atop elem (atopAll rest)
+
 atop : Pic -> Pic -> Pic
 atop picAtop picBelow =
   { asForm = C.group [ picBelow.asForm, picAtop.asForm ]
@@ -117,7 +125,7 @@ scaleDim factor dim =
   }
 
 alpha : Float -> Pic -> Pic
-alpha a = liftPic (C.alpha a) identity
+alpha a = liftPic (C.alpha (clamp 0 1 a)) identity
 
 withDim : Dim -> Pic -> Pic
 withDim dim { asForm } = { asForm = asForm, picSize = dim }
