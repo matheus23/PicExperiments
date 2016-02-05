@@ -14,7 +14,7 @@ type alias Model =
 
 type DragginState
   = NotDraggin
-  | Draggin Float
+  | Draggin Int Float
 
 type Action
   = StartDraggin
@@ -32,8 +32,8 @@ view { intValue, state } =
   case state of
     NotDraggin ->
       Reactive.onFingerDown (always <| Just StartDraggin) <| Reactive.static <| defaultText (toString intValue)
-    Draggin delta ->
-      draggingView intValue delta
+    Draggin startValue delta ->
+      draggingView startValue delta
 
 draggingView : Int -> Float -> Reactive Action
 draggingView intValue delta =
@@ -49,19 +49,19 @@ update action { intValue, state } =
     NotDraggin ->
       case action of
         StartDraggin ->
-          { intValue = intValue, state = Draggin 0 }
+          { intValue = intValue, state = Draggin intValue 0 }
         StopDraggin ->
           { intValue = intValue, state = NotDraggin }
         ChangeDraggin delta ->
           { intValue = intValue, state = NotDraggin }
-    Draggin delta ->
+    Draggin startValue delta ->
       case action of
         StartDraggin ->
-          { intValue = intValue, state = Draggin delta }
+          { intValue = intValue, state = Draggin startValue delta }
         StopDraggin ->
-          { intValue = intValue + valueChange delta, state = NotDraggin }
+          { intValue = startValue + valueChange delta, state = NotDraggin }
         ChangeDraggin newDelta ->
-          { intValue = intValue, state = Draggin newDelta }
+          { intValue = startValue + valueChange delta, state = Draggin startValue newDelta }
 
 wheelElemHeight : Float
 wheelElemHeight = 40
