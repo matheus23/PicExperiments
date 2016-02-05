@@ -1,67 +1,42 @@
 module Expr.LitInt where
 
-import Graphics.Element exposing (Element)
 import Pic exposing (Pic, Direction(..))
 import Text exposing (Text)
-import App exposing (App)
 import Reactive exposing (Reactive, Event(..))
 import Color
 
 type alias Model =
   { intValue : Int
-  , state : DragginState
+  , state : DraggingState
   }
 
-type DragginState
-  = NotDraggin
-  | Draggin Int Float
-
-type Action
-  = StartDraggin
-  | ChangeDraggin Float
-  | StopDraggin
+type DraggingState
+  = NotDragging
+  | Dragging Int Float
 
 fromInt : Int -> Model
 fromInt int =
   { intValue = int
-  , state = NotDraggin
+  , state = NotDragging
   }
 
-view : Model -> Reactive Action
+view : Model -> Reactive Model
 view { intValue, state } =
   case state of
-    NotDraggin ->
-      Reactive.onFingerDown (always <| Just StartDraggin) <| Reactive.static <| defaultText (toString intValue)
-    Draggin startValue delta ->
+    NotDragging ->
+      Reactive.onFingerDown (always <| Just { intValue = intValue, state = Dragging intValue 0 })
+      <| Reactive.static
+      <| defaultText (toString intValue)
+    Dragging startValue delta ->
       draggingView startValue delta
 
-draggingView : Int -> Float -> Reactive Action
-draggingView intValue delta =
-  let changeValue (_, y) = ChangeDraggin -y
+draggingView : Int -> Float -> Reactive Model
+draggingView startValue delta =
+  let changeValue (_, y) = { intValue = startValue + valueChange -y, state = Dragging startValue -y }
    in
-    Reactive.static (showWheel intValue delta)
-    |> Reactive.onFingerUp (always <| Just StopDraggin)
+    Reactive.static (showWheel startValue delta)
+    |> Reactive.onFingerUp (always <| Just { intValue = startValue + valueChange delta, state = NotDragging })
     |> Reactive.onFingerMove (Just << changeValue)
-
-update : Action -> Model -> Model
-update action { intValue, state } =
-  case state of
-    NotDraggin ->
-      case action of
-        StartDraggin ->
-          { intValue = intValue, state = Draggin intValue 0 }
-        StopDraggin ->
-          { intValue = intValue, state = NotDraggin }
-        ChangeDraggin delta ->
-          { intValue = intValue, state = NotDraggin }
-    Draggin startValue delta ->
-      case action of
-        StartDraggin ->
-          { intValue = intValue, state = Draggin startValue delta }
-        StopDraggin ->
-          { intValue = startValue + valueChange delta, state = NotDraggin }
-        ChangeDraggin newDelta ->
-          { intValue = startValue + valueChange delta, state = Draggin startValue newDelta }
 
 wheelElemHeight : Float
 wheelElemHeight = 40
