@@ -148,9 +148,11 @@ text content =
       h = toFloat (E.heightOf asElement)
       textSize =
         { toLeft = -w / 2
-        , toTop = h * (1/3)
+        --, toTop = h * (1/3)
+        , toTop = h * (1/2)
         , toRight = w / 2
-        , toBottom = -h * (2/3)
+        --, toBottom = -h * (2/3)
+        , toBottom = -h * (1/2)
         }
    in { asForm = C.text content
       , picSize = textSize

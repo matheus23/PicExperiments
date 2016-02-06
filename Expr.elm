@@ -10,7 +10,11 @@ import Expr.LitInt as LitInt
 
 type Expr
   = Hole
+  | Apply Expr (List Expr)
   | LitInt LitInt.Model
+
+initApply : Expr
+initApply = Apply Hole [Hole]
 
 defaultText : String -> Pic
 defaultText = Pic.scale 3 << Pic.text << Text.fromString
@@ -20,6 +24,7 @@ viewExpr expr =
   case expr of
     Hole -> viewHole
     LitInt model -> Reactive.alwaysForwardMessage LitInt (LitInt.view model)
+    Apply func args -> viewApply func args
 
 viewHole : Reactive Expr
 viewHole =
@@ -27,13 +32,35 @@ viewHole =
     radius = 20
     asPic = Pic.outlined (Pic.solid Color.darkGrey) <| Pic.rectFromDim <| Pic.squareDim radius
    in
-    Reactive.onFingerDown (always <| Just (LitInt (LitInt.fromInt 0))) <| Reactive.static asPic
+    Reactive.onFingerDown (always <| Just initApply) <| Reactive.static asPic
+    --Reactive.onFingerDown (always <| Just (LitInt (LitInt.fromInt 0))) <| Reactive.static asPic
+
+viewApply : Expr -> List Expr -> Reactive Expr
+viewApply func args =
+  let
+    reactFunc newFunc = Apply newFunc args
+    replaceIndex index list replacement =
+      List.indexedMap
+        (\idx listElem -> if idx == index then replacement else listElem)
+        list
+    createArg index expr =
+      Reactive.alwaysForwardMessage (Apply func << replaceIndex index args)
+      <| Reactive.padded 4 <| viewExpr expr
+    parens pic =
+      Pic.nextTo Left (Pic.nextTo Right pic (defaultText ")")) (defaultText "(")
+
+    plusButton =
+      Reactive.onFingerDown (always <| Just <| Apply func (args ++ [Hole]))
+        <| Reactive.static (Pic.filled Color.red (Pic.circle 20))
+   in
+    Reactive.liftReactive parens identity
+      (Reactive.appendTo Right
+        (Reactive.padded 4 <| Reactive.alwaysForwardMessage reactFunc <| viewExpr func)
+        (List.indexedMap createArg args ++ [plusButton]))
+
 
 evaluate : Expr -> Pic
-evaluate expr =
-  case expr of
-    Hole -> defaultText "<hole>"
-    LitInt int -> defaultText (toString int ++ " : Int")
+evaluate expr = defaultText (toString expr)
 
 view : Expr -> Reactive Expr
 view expr =
