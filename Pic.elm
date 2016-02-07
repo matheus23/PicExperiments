@@ -136,6 +136,12 @@ rectFromDim dim =
       , shapeSize = dim
       }
 
+vgap : Float -> Pic
+vgap w = withDim { toLeft = -w / 2, toRight = w / 2, toBottom = 0, toTop = 0 } (empty pic)
+
+hgap : Float -> Pic
+hgap h = withDim { toLeft = 0, toRight = 0, toBottom = -h / 2, toTop = h / 2 } (empty pic)
+
 filled : Color -> Shape -> Pic
 filled col shape =
   { asForm = C.filled col shape.elmShape
