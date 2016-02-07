@@ -1,7 +1,8 @@
 module Button where
 
 import Reactive exposing (Reactive, Event(..), TouchType(..))
-import Pic exposing (Pic)
+import Pic exposing (Pic, pic)
+import PicLike exposing (..)
 import Color
 import App exposing (..)
 import Text exposing (Text)
@@ -17,7 +18,7 @@ anyButton content =
           Press -> Pressed
           Release releasedInside -> Normal
 
-      viewPic state = Pic.atop content (background state content)
+      viewPic state = atop pic content (background state content)
 
       viewButton state =
         Reactive.onEvent (createAction (viewPic state))
@@ -33,7 +34,7 @@ anyButton content =
         case state of
           Normal -> Pic.padded 4 <| Pic.filled (Color.lightBlue) (Pic.rectFromDim (Pic.padded 10 inner).picSize)
           Pressed ->
-            Pic.atop
+            atop pic
               (Pic.filled (Color.lightBlue) (Pic.rectFromDim (Pic.padded 10 inner).picSize))
               (Pic.filled (Color.black) (Pic.rectFromDim (Pic.padded 14 inner).picSize))
 
@@ -44,7 +45,7 @@ anyButton content =
 
 textButton : String -> App State Action
 textButton label =
-  anyButton (Pic.scale 2 <| Pic.text <| Text.color Color.white <| Text.bold <| Text.fromString label)
+  anyButton (scale pic 2 <| Pic.text <| Text.color Color.white <| Text.bold <| Text.fromString label)
 
 onPress : message -> Reactive Action -> Reactive (Action, Maybe message)
 onPress message buttonReactive =

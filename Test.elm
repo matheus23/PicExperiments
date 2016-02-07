@@ -4,16 +4,18 @@ import Graphics.Element exposing (Element)
 import Signal exposing (Signal)
 import Text
 import Color
-import Pic exposing (..)
-import Reactive exposing (Reactive, Event(..))
+import Pic exposing (Pic, pic)
+import Reactive exposing (Reactive, Event(..), reactive)
 import App exposing (App)
 import Button exposing (Action(..))
+import PicLike exposing (..)
+import Dim exposing (..)
 
 type Action = Add
 
 someCircle : Pic
 someCircle =
-  filled Color.red (circle 10)
+  Pic.filled Color.red (Pic.circle 10)
 
 main : Signal Element
 main =
@@ -29,8 +31,8 @@ main =
     updateValue Add value = value + 1
 
     view (value, buttonState) =
-      Reactive.nextTo Down
+      nextTo reactive Down
         (Button.onPress Add (countButton.view buttonState))
-        (Reactive.scale 10 <| Reactive.static <| text <| Text.fromString <| toString value)
+        (scale reactive 10 <| Reactive.static <| Pic.text <| Text.fromString <| toString value)
 
   in App.run { init = (0, countButton.init), update = update, view = view }

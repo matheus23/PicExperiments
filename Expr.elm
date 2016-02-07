@@ -1,10 +1,12 @@
 module Expr where
 
 import Graphics.Element exposing (Element)
-import Pic exposing (Pic, Direction(..))
+import Pic exposing (Pic, pic)
+import Dim exposing (..)
+import PicLike exposing (..)
 import Text exposing (Text)
 import App exposing (App)
-import Reactive exposing (Reactive, Event(..))
+import Reactive exposing (Reactive, Event(..), reactive)
 import Color
 import Expr.LitInt as LitInt
 
@@ -17,7 +19,7 @@ initApply : Expr
 initApply = Apply Hole [Hole]
 
 defaultText : String -> Pic
-defaultText = Pic.scale 3 << Pic.text << Text.fromString
+defaultText = scale pic 3 << Pic.text << Text.fromString
 
 viewExpr : Expr -> Reactive Expr
 viewExpr expr =
@@ -46,17 +48,22 @@ viewApply func args =
     createArg index expr =
       Reactive.alwaysForwardMessage (Apply func << replaceIndex index args)
       <| Reactive.padded 4 <| viewExpr expr
-    parens pic =
-      Pic.nextTo Left (Pic.nextTo Right pic (defaultText ")")) (defaultText "(")
+
+    leftParens = Reactive.static (defaultText "(")
+    rightParens = Reactive.static (defaultText ")")
+
+    parens react =
+      nextTo reactive Left (nextTo reactive Right react rightParens) leftParens
 
     plusButton =
       Reactive.onFingerDown (always <| Just <| Apply func (args ++ [Hole]))
         <| Reactive.static (Pic.filled Color.red (Pic.circle 20))
    in
-    Reactive.liftReactive parens identity
-      (Reactive.appendTo Right
-        (Reactive.padded 4 <| Reactive.alwaysForwardMessage reactFunc <| viewExpr func)
-        (List.indexedMap createArg args ++ [plusButton]))
+    centered reactive
+      (parens
+        (appendTo reactive Right
+          (Reactive.padded 4 <| Reactive.alwaysForwardMessage reactFunc <| viewExpr func)
+          (List.indexedMap createArg args ++ [plusButton])))
 
 
 evaluate : Expr -> Pic
@@ -64,8 +71,8 @@ evaluate expr = defaultText (toString expr)
 
 view : Expr -> Reactive Expr
 view expr =
-  Reactive.appendTo Down (viewExpr expr)
-    [ Reactive.static <| Pic.padded 10 <| Pic.filled Color.darkGrey <| Pic.rectFromDim (Pic.Dim -300 1 300 -1)
+  appendTo reactive Down (viewExpr expr)
+    [ Reactive.static <| Pic.padded 10 <| Pic.filled Color.darkGrey <| Pic.rectFromDim (Dim -300 1 300 -1)
     , Reactive.static <| evaluate expr
     ]
 

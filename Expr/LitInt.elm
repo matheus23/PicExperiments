@@ -1,6 +1,8 @@
 module Expr.LitInt where
 
-import Pic exposing (Pic, Direction(..))
+import Pic exposing (Pic, pic)
+import Dim exposing (..)
+import PicLike exposing (..)
 import Text exposing (Text)
 import Reactive exposing (Reactive, Event(..))
 import Color
@@ -48,14 +50,14 @@ valueChange : Float -> Int
 valueChange delta = round (delta / wheelElemHeight)
 
 defaultText : String -> Pic
-defaultText = Pic.scale 3 << Pic.text << Text.fromString
+defaultText = scale pic 3 << Pic.text << Text.fromString
 
 defaultTextGreen : String -> Pic
-defaultTextGreen = Pic.scale 3 << Pic.text << Text.color Color.green << Text.fromString
+defaultTextGreen = scale pic 3 << Pic.text << Text.color Color.green << Text.fromString
 
 appendWithRefDim : Direction -> Pic -> List Pic -> Pic
 appendWithRefDim inDirection reference pics =
-  Pic.withDim reference.picSize (Pic.appendTo inDirection reference pics)
+  Pic.withDim reference.picSize (appendTo pic inDirection reference pics)
 
 showWheel : Int -> Float -> Pic
 showWheel intValue dragDistance =
@@ -68,9 +70,9 @@ showWheel intValue dragDistance =
     valueText = defaultTextGreen (toString actualValue)
     valuesDiffBefore = List.map negate [1 .. wheelSize]
     valuesDiffAfter = [1 .. wheelSize]
-    createValue diff = Pic.move (0, offsetFromDiff diff) (alphaFromDiff diff (defaultText (toString (actualValue + diff))))
+    createValue diff = move pic (0, offsetFromDiff diff) (alphaFromDiff diff (defaultText (toString (actualValue + diff))))
     valuesBefore = List.map createValue valuesDiffBefore
     valuesAfter = List.map createValue valuesDiffAfter
-    wheel = Pic.atopAll (valuesBefore ++ [Pic.move (0, offset) valueText] ++ valuesAfter)
+    wheel = atopAll pic (valuesBefore ++ [move pic (0, offset) valueText] ++ valuesAfter)
    in
     Pic.withDim valueText.picSize wheel

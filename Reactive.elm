@@ -1,6 +1,8 @@
 module Reactive where
 
-import Pic exposing (Pic, Direction)
+import Pic exposing (Pic, pic)
+import Dim exposing (..)
+import PicLike exposing (..)
 
 type alias Pos = (Float, Float)
 
@@ -23,6 +25,15 @@ type alias Reactive message =
   { visual : Pic
   , pick : Pos -> Navigation
   , reaction : Event -> Navigation -> Maybe message
+  }
+
+reactive : PicLike (Reactive message)
+reactive =
+  { move_ = moveReactive
+  , scale_ = scaleReactive
+  , atop_ = atopReactive
+  , empty_ = static (empty pic)
+  , dimensions_ = .visual >> .picSize
   }
 
 -- almost like liftReactive0
@@ -50,20 +61,9 @@ forwardMessage mapping reactive =
 alwaysForwardMessage : (messageA -> messageB) -> Reactive messageA -> Reactive messageB
 alwaysForwardMessage mapping reactive = forwardMessage (\msg -> Just (mapping msg)) reactive
 
-appendTo : Direction -> Reactive message -> List (Reactive message) -> Reactive message
-appendTo inDirection reference pics =
-  case pics of
-    [] -> reference
-    (pic :: picsRest) -> nextTo inDirection reference (appendTo inDirection pic picsRest)
-
-nextTo : Direction -> Reactive message -> Reactive message -> Reactive message
-nextTo inDirection reference reactive =
-  let offset = Pic.offsetNextTo inDirection reference.visual reactive.visual
-   in atop (move offset reactive) reference
-
-atop : Reactive message -> Reactive message -> Reactive message
-atop reactiveAbove reactiveBelow =
-  { visual = Pic.atop reactiveAbove.visual reactiveBelow.visual
+atopReactive : Reactive message -> Reactive message -> Reactive message
+atopReactive reactiveAbove reactiveBelow =
+  { visual = atop pic reactiveAbove.visual reactiveBelow.visual
   , pick = findOutWhich reactiveAbove reactiveBelow
   , reaction = delegateEvent reactiveAbove reactiveBelow
   }
@@ -91,19 +91,19 @@ delegateEvent reactiveAbove reactiveBelow event navigation =
     Above nav -> reactiveAbove.reaction event nav
     Below nav -> reactiveBelow.reaction event nav
 
-isInside : Pos -> Pic.Dim -> Bool
+isInside : Pos -> Dim -> Bool
 isInside (x, y) dims =
   let between lower value upper = lower <= value && value <= upper
    in between dims.toLeft x dims.toRight && between dims.toBottom y dims.toTop
 
-move : Pos -> Reactive message -> Reactive message
-move offset = liftReactive (Pic.move offset) (movePick offset)
+moveReactive : Pos -> Reactive message -> Reactive message
+moveReactive offset = liftReactive (move pic offset) (movePick offset)
 
 movePick : Pos -> Pos -> Pos
 movePick (offx, offy) (x, y) = (x-offx, y-offy)
 
-scale : Float -> Reactive message -> Reactive message
-scale factor = liftReactive (Pic.scale factor) (scalePick factor)
+scaleReactive : Float -> Reactive message -> Reactive message
+scaleReactive factor = liftReactive (scale pic factor) (scalePick factor)
 
 scalePick : Float -> Pos -> Pos
 scalePick factor (x, y) = (x / factor, y / factor)
