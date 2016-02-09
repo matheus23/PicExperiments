@@ -14,17 +14,9 @@ type TouchType
   | FingerUp
   | FingerMove
 
--- Shows where to find reactive:
-type Navigation
-  = Here
-  | Nowhere
-  | Above Navigation
-  | Below Navigation
-
 type alias Reactive message =
   { visual : Pic
-  , pick : Pos -> Navigation
-  , reaction : Event -> Navigation -> Maybe message
+  , reaction : Event -> Maybe message
   }
 
 reactive : PicLike (Reactive message)
@@ -40,22 +32,26 @@ reactive =
 static : Pic -> Reactive message
 static picture =
   { visual = picture
-  , pick = \pos -> if isInside pos (picture.picSize) then Here else Nowhere
-  , reaction = \_ _ -> Nothing
+  , reaction = \_ -> Nothing
   }
+
+makeStatic : Reactive a -> Reactive b
+makeStatic reactive = static reactive.visual
 
 liftReactive : (Pic -> Pic) -> (Pos -> Pos) -> Reactive message -> Reactive message
 liftReactive mapPic mapPosition reactive =
-  { visual = mapPic reactive.visual
-  , pick = reactive.pick << mapPosition
-  , reaction = reactive.reaction
-  }
+  let
+    mapEvent (TouchEvent evType pos) =
+      TouchEvent evType (mapPosition pos)
+  in
+    { visual = mapPic reactive.visual
+    , reaction = mapEvent >> reactive.reaction
+    }
 
 forwardMessage : (messageA -> Maybe messageB) -> Reactive messageA -> Reactive messageB
 forwardMessage mapping reactive =
   { visual = reactive.visual
-  , pick = reactive.pick
-  , reaction = \ev nav -> reactive.reaction ev nav `Maybe.andThen` mapping
+  , reaction = \ev -> reactive.reaction ev `Maybe.andThen` mapping
   }
 
 alwaysForwardMessage : (messageA -> messageB) -> Reactive messageA -> Reactive messageB
@@ -64,32 +60,24 @@ alwaysForwardMessage mapping reactive = forwardMessage (\msg -> Just (mapping ms
 atopReactive : Reactive message -> Reactive message -> Reactive message
 atopReactive reactiveAbove reactiveBelow =
   { visual = atop pic reactiveAbove.visual reactiveBelow.visual
-  , pick = findOutWhich reactiveAbove reactiveBelow
   , reaction = delegateEvent reactiveAbove reactiveBelow
   }
 
-findOutWhich : Reactive message -> Reactive message -> Pos -> Navigation
-findOutWhich reactiveAbove reactiveBelow pos =
+delegateEvent : Reactive message -> Reactive message -> Event -> Maybe message
+delegateEvent reactiveAbove reactiveBelow (TouchEvent evType pos) =
   let
     dimAbove = reactiveAbove.visual.picSize
     dimBelow = reactiveBelow.visual.picSize
    in
       if isInside pos dimAbove then
-        Above (reactiveAbove.pick pos)
+        reactiveAbove.reaction (TouchEvent evType pos)
       else if isInside pos dimBelow then
-        Below (reactiveBelow.pick pos)
+        reactiveBelow.reaction (TouchEvent evType pos)
       else if isInside pos (Pic.atopDims dimAbove dimBelow) then
-        Here
+        Nothing
       else
-        Nowhere
+        Nothing
 
-delegateEvent : Reactive message -> Reactive message -> Event -> Navigation -> Maybe message
-delegateEvent reactiveAbove reactiveBelow event navigation =
-  case navigation of
-    Here -> Nothing
-    Nowhere -> Nothing
-    Above nav -> reactiveAbove.reaction event nav
-    Below nav -> reactiveBelow.reaction event nav
 
 isInside : Pos -> Dim -> Bool
 isInside (x, y) dims =
@@ -114,12 +102,11 @@ padded padding = liftReactive (Pic.padded padding) identity
 onEvent : (Event -> Maybe message) -> Reactive message -> Reactive message
 onEvent getMessage reactive =
   let
-    react event navigation =
-      case navigation of
-        Here -> Maybe.oneOf [ getMessage event, reactive.reaction event navigation ]
-        otherwise -> reactive.reaction event navigation
+    react (TouchEvent evType pos) =
+      if isInside pos reactive.visual.picSize
+        then Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), getMessage (TouchEvent evType pos) ]
+        else Nothing
    in { visual = reactive.visual
-      , pick = reactive.pick
       , reaction = react
       }
 

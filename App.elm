@@ -1,7 +1,7 @@
 module App where
 
 import Graphics.Element exposing (Element)
-import Reactive exposing (Reactive, Event(..), TouchType(..), Navigation(..))
+import Reactive exposing (Reactive, Event(..), TouchType(..))
 import Pic exposing (Pic)
 import ExtraSignals
 import Window
@@ -17,29 +17,22 @@ type alias App model message =
 run : App model message -> Signal Element
 run { init, update, view } =
   let
-    updateState newModel navigation =
-      (newModel, view newModel, navigation)
+    updateState newModel =
+      (newModel, view newModel)
 
-    updateReactive event (model, reactive, oldNavigation) =
-      let
-        navigation = maybeNewNavigation event reactive oldNavigation
-       in case reactive.reaction event navigation of
-            Just message ->
-              updateState (update message model) navigation
+    updateReactive event (model, reactive) =
+      case reactive.reaction event of
+        Just message ->
+          updateState (update message model)
 
-            Nothing ->
-              (model, reactive, navigation)
+        Nothing ->
+          (model, reactive)
 
-    maybeNewNavigation event reactive navigation =
-      case event of
-        (TouchEvent FingerDown pos) -> reactive.pick pos
-        otherwise -> navigation
-
-    makeElement size (_, { visual }, _) =
+    makeElement size (_, { visual }) =
       Pic.toElement size visual
   in
     Signal.map2 makeElement Window.dimensions
-    <| Signal.foldp updateReactive (init, view init, Nowhere) (eventsSignal Window.dimensions)
+    <| Signal.foldp updateReactive (init, view init) (eventsSignal Window.dimensions)
 
 eventsSignal : Signal (Int, Int) -> Signal Event
 eventsSignal collageSize =
