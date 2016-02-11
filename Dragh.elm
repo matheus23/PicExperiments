@@ -18,7 +18,7 @@ type Shit
 
 type DragState
   = NothingDragged
-  | Dragged Shit Shit
+  | Dragged Shit Shit (Float, Float) (Float, Float)
 
 
 holePic : Float -> Pic
@@ -75,17 +75,17 @@ dropReaction dragState pack =
     NothingDragged ->
       Nothing
 
-    Dragged shit undoDrag ->
+    Dragged shit undoDrag fingerPos grabPos ->
       Just (pack shit, NothingDragged)
 
 
-dragReaction : DragState -> (Shit -> Shit) -> Shit -> Shit -> Maybe (Shit, DragState)
-dragReaction dragState pack whatToDrag replacement =
+dragReaction : DragState -> (Shit -> Shit) -> Shit -> Shit -> (Float, Float) -> Maybe (Shit, DragState)
+dragReaction dragState pack whatToDrag replacement grabPos =
   case dragState of
     NothingDragged ->
-      Just (pack replacement, Dragged whatToDrag (pack whatToDrag))
+      Just (pack replacement, Dragged whatToDrag (pack whatToDrag) (0, 0) grabPos)
 
-    Dragged _ revertChanges ->
+    Dragged _ revertChanges fingerPos grabPos ->
       Nothing
 
 
@@ -103,17 +103,8 @@ viewGrabMe color pack dragState =
   let
     grabMeStatic =
       Reactive.static (grabMe color)
-
-    failDrag dragState =
-      case dragState of
-        NothingDragged ->
-          Nothing
-
-        Dragged sth revertChanges ->
-          Just (revertChanges, NothingDragged)
   in
-    Reactive.onFingerUp (always <| failDrag dragState) <|
-    Reactive.onFingerDown (always <| dragReaction dragState pack (GrabMe color) Hole)
+    Reactive.onFingerDown (dragReaction dragState pack (GrabMe color) Hole)
       grabMeStatic
 
 
@@ -142,9 +133,31 @@ view pack (shit, dragState) =
       viewBesides pack dragState leftShit rightShit
 
 
+viewWhole : (Shit, DragState) -> Reactive (Shit, DragState)
+viewWhole (shit, dragState) =
+  case dragState of
+    NothingDragged ->
+      view identity (shit, dragState)
+
+    Dragged currentlyDragging reset fingerPos grabPos ->
+      let
+        vecSub (a, b) (u, v) = (a - u, b - v)
+        reactMove pos = Just (shit, Dragged currentlyDragging reset pos grabPos)
+        showDraggedAtop picture =
+          atop pic
+            (move pic (vecSub fingerPos grabPos) (view identity (currentlyDragging, NothingDragged)).visual)
+            picture
+        failDrag _ = Just (reset, NothingDragged)
+      in
+        Reactive.onFingerUp failDrag
+        <| Reactive.onFingerMove reactMove
+            (Reactive.liftReactive showDraggedAtop identity
+              (view identity (shit, dragState)))
+
+
 main : Signal Element
 main = App.run
   { init = (Besides (Besides (GrabMe Color.red) Hole) (GrabMe Color.green), NothingDragged)
   , update = always
-  , view = view identity
+  , view = viewWhole
   }

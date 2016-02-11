@@ -40,11 +40,17 @@ eventsSignal collageSize =
     makeFloatVec (intX, intY) = (toFloat intX, toFloat intY)
     fixedTouchPos = Signal.map2 fixPosition collageSize ExtraSignals.fingerPosition
     fixedMousePos = Signal.map2 fixPosition collageSize (Signal.map makeFloatVec Mouse.position)
+    mouseDown = Signal.filter (\isDown -> isDown == True) True Mouse.isDown
+    mouseUp = Signal.filter (\isDown -> isDown == False) False Mouse.isDown
+    mousePress = Signal.sampleOn mouseDown fixedMousePos
+    mouseRelease = Signal.sampleOn mouseUp fixedMousePos
    in Signal.mergeMany
-        [ Signal.map (TouchEvent FingerDown) (Signal.sampleOn ExtraSignals.fingerPressed fixedTouchPos)
+        [ {-Signal.map (TouchEvent FingerDown) mousePress
+        , Signal.map (TouchEvent FingerUp) mouseRelease
+        , Signal.map (TouchEvent FingerMove) fixedMousePos
+        ,-} Signal.map (TouchEvent FingerDown) (Signal.sampleOn ExtraSignals.fingerPressed fixedTouchPos)
         , Signal.map (TouchEvent FingerUp) (Signal.sampleOn ExtraSignals.fingerReleased fixedTouchPos)
         , Signal.map (TouchEvent FingerMove) fixedTouchPos
-        , Signal.map (TouchEvent FingerMove) fixedMousePos
         ]
 
 -- turns event-space coordinates to collage-space coordinates

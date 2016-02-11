@@ -85,10 +85,10 @@ isInside (x, y) dims =
    in between dims.toLeft x dims.toRight && between dims.toBottom y dims.toTop
 
 moveReactive : Pos -> Reactive message -> Reactive message
-moveReactive offset = liftReactive (move pic offset) (movePick offset)
+moveReactive offset = liftReactive (move pic offset) (moveEvent offset)
 
-movePick : Pos -> Pos -> Pos
-movePick (offx, offy) (x, y) = (x-offx, y-offy)
+moveEvent : Pos -> Pos -> Pos
+moveEvent (offx, offy) (x, y) = (x-offx, y-offy)
 
 scaleReactive : Float -> Reactive message -> Reactive message
 scaleReactive factor = liftReactive (scale pic factor) (scalePick factor)
@@ -102,10 +102,8 @@ padded padding = liftReactive (Pic.padded padding) identity
 onEvent : (Event -> Maybe message) -> Reactive message -> Reactive message
 onEvent getMessage reactive =
   let
-    react (TouchEvent evType pos) =
-      if isInside pos reactive.visual.picSize
-        then Maybe.oneOf [ reactive.reaction (TouchEvent evType pos), getMessage (TouchEvent evType pos) ]
-        else Nothing
+    react event =
+      Maybe.oneOf [ reactive.reaction event, getMessage event ]
    in { visual = reactive.visual
       , reaction = react
       }
